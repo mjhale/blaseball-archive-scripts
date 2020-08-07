@@ -1,8 +1,7 @@
 /* eslint no-underscore-dangle: ["error", { "allow": ["_id"] }] */
 /**
- * A program that generates Blaseball pitcher stats based on gameDataUpdate feeds
- *
- * WIP
+ * A script that generates Blaseball pitcher stats based on gameDataUpdate feeds
+ * @WIP
  */
 const fs = require('fs');
 const ndjson = require('ndjson');
