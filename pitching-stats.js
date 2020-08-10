@@ -2,10 +2,13 @@
 /**
  * A script that generates Blaseball pitcher stats based on gameDataUpdate feeds
  * - Tailored to blaseball-reference frontend usage
- * - @WIP
+ *
+ * @TODO: Seasonal data should account for player mid-season team changes
+ * @WIP
  */
 const fs = require('fs');
 const ndjson = require('ndjson');
+const deburr = require('lodash.deburr');
 
 // Location of feed archive
 const gameDataUpdatesFile = './data/blaseball-log.json';
@@ -57,23 +60,27 @@ pipeline.on('data', (gameDataUpdate) => {
 
     // Create initial summary objects if pitcher hasn't been previously seen
     if (!Object.prototype.hasOwnProperty.call(pitcherSummaries, currPitcher)) {
+      const name = gameState.topOfInning ? gameState.homePitcherName : gameState.awayPitcherName;
       pitcherSummaries[currPitcher] = createPitcherSummaryObject({
         id: currPitcher,
-        name: gameState.topOfInning ? gameState.homePitcherName : gameState.awayPitcherName
+        name,
+        slug: deburr(name).toLowerCase().replace(/\s/g, '-')
       });
     }
 
     if (currPitcher !== awayPitcher && !Object.prototype.hasOwnProperty.call(pitcherSummaries, awayPitcher)) {
       pitcherSummaries[awayPitcher] = createPitcherSummaryObject({
         id: awayPitcher,
-        name: gameState.awayPitcherName
+        name: gameState.awayPitcherName,
+        slug: deburr(gameState.awayPitcherName).toLowerCase().replace(/\s/g, '-')
       });
     }
 
     if (currPitcher !== homePitcher && !Object.prototype.hasOwnProperty.call(pitcherSummaries, homePitcher)) {
       pitcherSummaries[homePitcher] = createPitcherSummaryObject({
         id: homePitcher,
-        name: gameState.homePitcherName
+        name: gameState.homePitcherName,
+        slug: deburr(gameState.homePitcherName).toLowerCase().replace(/\s/g, '-')
       });
     }
 
@@ -111,7 +118,7 @@ pipeline.on('data', (gameDataUpdate) => {
         lastGameSeason: gameState.season,
         name: name,
         position: 'rotation',
-        slug: name.toLowerCase().replace(/\s/g, '-')
+        slug: deburr(name).toLowerCase().replace(/\s/g, '-')
       });
     } else {
       let player = playerList.find((p) => p.id === currPitcher);
@@ -142,7 +149,7 @@ pipeline.on('data', (gameDataUpdate) => {
           lastGameSeason: gameState.season,
           name: gameState.awayPitcherName,
           position: 'rotation',
-          slug: gameState.awayPitcherName.toLowerCase().replace(/\s/g, '-')
+          slug: deburr(gameState.awayPitcherName).toLowerCase().replace(/\s/g, '-')
         });
       } else {
         let player = playerList.find((p) => p.id === awayPitcher);
@@ -177,7 +184,7 @@ pipeline.on('data', (gameDataUpdate) => {
           lastGameSeason: gameState.season,
           name: gameState.homePitcherName,
           position: 'rotation',
-          slug: gameState.homePitcherName.toLowerCase().replace(/\s/g, '-')
+          slug: deburr(gameState.homePitcherName).toLowerCase().replace(/\s/g, '-')
         });
       } else {
         let player = playerList.find((p) => p.id === homePitcher);
@@ -191,24 +198,24 @@ pipeline.on('data', (gameDataUpdate) => {
 
     // Initialize pitcher stat objects for newly recorded seasons and postseasons
     // - Postseasons
-    if (gameState.isPostseason && !pitcherSummaries[currPitcher].postSeasons.hasOwnProperty(gameState.season)) {
-      pitcherSummaries[currPitcher].postSeasons[gameState.season] = initialPitcherStatsObject();
+    if (gameState.isPostseason && !pitcherSummaries[currPitcher].postseasons.hasOwnProperty(gameState.season)) {
+      pitcherSummaries[currPitcher].postseasons[gameState.season] = initialPitcherStatsObject();
     }
 
     if (
       currPitcher !== awayPitcher &&
       gameState.isPostseason &&
-      !pitcherSummaries[awayPitcher].postSeasons.hasOwnProperty(gameState.season)
+      !pitcherSummaries[awayPitcher].postseasons.hasOwnProperty(gameState.season)
     ) {
-      pitcherSummaries[awayPitcher].postSeasons[gameState.season] = initialPitcherStatsObject();
+      pitcherSummaries[awayPitcher].postseasons[gameState.season] = initialPitcherStatsObject();
     }
 
     if (
       currPitcher !== homePitcher &&
       gameState.isPostseason &&
-      !pitcherSummaries[homePitcher].postSeasons.hasOwnProperty(gameState.season)
+      !pitcherSummaries[homePitcher].postseasons.hasOwnProperty(gameState.season)
     ) {
-      pitcherSummaries[homePitcher].postSeasons[gameState.season] = initialPitcherStatsObject();
+      pitcherSummaries[homePitcher].postseasons[gameState.season] = initialPitcherStatsObject();
     }
 
     // - Seasons
@@ -235,23 +242,23 @@ pipeline.on('data', (gameDataUpdate) => {
     // Additional helper variables for various stat tracking scenarios
     const currPitcherEvents = pitcherEvents[currPitcher];
     const currPitcherSummary = gameState.isPostseason
-      ? pitcherSummaries[currPitcher].postSeasons[gameState.season]
+      ? pitcherSummaries[currPitcher].postseasons[gameState.season]
       : pitcherSummaries[currPitcher].seasons[gameState.season];
 
     const awayPitcherEvents = pitcherEvents[awayPitcher];
     const awayPitcherSummary = gameState.isPostseason
-      ? pitcherSummaries[awayPitcher].postSeasons[gameState.season]
+      ? pitcherSummaries[awayPitcher].postseasons[gameState.season]
       : pitcherSummaries[awayPitcher].seasons[gameState.season];
 
     const homePitcherEvents = pitcherEvents[homePitcher];
     const homePitcherSummary = gameState.isPostseason
-      ? pitcherSummaries[homePitcher].postSeasons[gameState.season]
+      ? pitcherSummaries[homePitcher].postseasons[gameState.season]
       : pitcherSummaries[homePitcher].seasons[gameState.season];
 
     const prevPitcherEvents = prevPitcher ? pitcherEvents[prevPitcher] : null;
     const prevPitcherSummary = prevPitcher
       ? prevGameState.isPostseason
-        ? pitcherSummaries[prevPitcher].postSeasons[prevGameState.season]
+        ? pitcherSummaries[prevPitcher].postseasons[prevGameState.season]
         : pitcherSummaries[prevPitcher].seasons[prevGameState.season]
       : null;
 
@@ -282,6 +289,7 @@ pipeline.on('data', (gameDataUpdate) => {
 
     // Increment innings pitched
     // @TODO: Account for mid-game pitcher changes
+    // @TODO: Recheck logic for end of game summation?
     if (
       (prevGameState && prevGameState.halfInningOuts === 2 && gameState.halfInningOuts === 0) ||
       gameState.lastUpdate.match(/Game Over/i) !== null
@@ -357,29 +365,21 @@ pipeline.on('data', (gameDataUpdate) => {
       );
     }
 
-    // Update incinerated pitcher player files following incineration
-    // @TODO: Increment saves for replacement pitchers?
-    const incineratedPitcherMatch = gameState.lastUpdate.match(/Rogue Umpire incinerated [\w\s]+ pitcher ([\w\s]+)!/i);
-    if (prevGameState && incineratedPitcherMatch !== null) {
-      let incineratedPitcherId = null;
-
-      // Locate incinerated pitcher ID and name
-      if (incineratedPitcherMatch[1] === prevGameState.homePitcherName) {
-        incineratedPitcherId = prevGameState.homePitcher;
-      } else {
-        incineratedPitcherId = prevGameState.awayPitcher;
-      }
+    // Update player attributes following incineration
+    // @TODO: Handle pitcher substitutions..?
+    const incineratedPlayerMatch = gameState.lastUpdate.match(/Rogue Umpire incinerated [\w\s]+ pitcher ([\w\s]+)!/i);
+    if (prevGameState && incineratedPlayerMatch !== null) {
+      const incineratedPlayerName = incineratedPlayerMatch[1];
+      let incineratedPlayer = playerList.find((player) => player.name === incineratedPlayerName);
 
       // Update incinerated player's player file
-      if (incineratedPitcherId) {
-        let incineratedPlayer = playerList.find((p) => p.id === incineratedPitcherId);
-
-        if (incineratedPlayer) {
-          incineratedPlayer.incineratedGameDay = prevGameState.day;
-          incineratedPlayer.incineratedGameId = prevGameState._id;
-          incineratedPlayer.incineratedGameSeason = prevGameState.season;
-          incineratedPlayer.isIncinerated = true;
-        }
+      if (incineratedPlayer) {
+        incineratedPlayer.incineratedGameDay = prevGameState.day;
+        incineratedPlayer.incineratedGameId = prevGameState._id;
+        incineratedPlayer.incineratedGameSeason = prevGameState.season;
+        incineratedPlayer.isIncinerated = true;
+      } else {
+        console.log(`Unable to locate incinerated player: ${incineratedPlayerName}`);
       }
     }
 
@@ -407,11 +407,11 @@ pipeline.on('data', (gameDataUpdate) => {
 
     // Increment strikeouts
     // @TODO: Check to see if currPitcher changes if strikeout leads to inning change
-    if (gameState.lastUpdate.match(/(strikes out|struck out)/i) !== null) {
-      currPitcherSummary.strikeouts += 1;
-      currPitcherEvents.push(
+    if (prevGameState && gameState.lastUpdate.match(/(strikes out|struck out)/i) !== null) {
+      prevPitcherSummary.strikeouts += 1;
+      prevPitcherEvents.push(
         createPitcherEventObject({
-          relativeGameState: gameState,
+          relativeGameState: prevGameState,
           result: 'strikeout'
         })
       );
@@ -445,7 +445,7 @@ pipeline.on('data', (gameDataUpdate) => {
     }
 
     // Increment home runs allowed
-    if (prevGameState && gameState.lastUpdate.match(/home run/i) !== null) {
+    if (prevGameState && gameState.lastUpdate.match(/home run|grand slam/i) !== null) {
       prevPitcherSummary.homeRuns += 1;
       prevPitcherEvents.push(
         createPitcherEventObject({
@@ -487,9 +487,10 @@ pipeline.on('data', (gameDataUpdate) => {
 // Perform final calculations after feed is processed
 pipeline.on('end', async () => {
   Object.keys(pitcherSummaries).forEach((pitcher) => {
-    let careerData = pitcherSummaries[pitcher].careerData;
+    let careerPostseasonData = pitcherSummaries[pitcher].careerPostseason;
+    let careerSeasonData = pitcherSummaries[pitcher].careerSeason;
     let seasonsData = pitcherSummaries[pitcher].seasons;
-    let postSeasonsData = pitcherSummaries[pitcher].postSeasons;
+    let postseasonsData = pitcherSummaries[pitcher].postseasons;
 
     Object.keys(seasonsData).forEach((season) => {
       let seasonStats = pitcherSummaries[pitcher].seasons[season];
@@ -506,72 +507,100 @@ pipeline.on('end', async () => {
       seasonStats.walkRate = calculateWalkRate(seasonStats);
       seasonStats.winningPercentage = calculateWinningPercentage(seasonStats);
 
-      // Add current season tallies to careerData
-      careerData.wins += seasonStats.wins;
-      careerData.losses += seasonStats.losses;
-      careerData.appearances += seasonStats.appearances;
-      careerData.inningsPitched += seasonStats.inningsPitched;
-      careerData.shutouts += seasonStats.shutouts;
-      careerData.hitsAllowed += seasonStats.hitsAllowed;
-      careerData.homeRuns += seasonStats.homeRuns;
-      careerData.earnedRuns += seasonStats.earnedRuns;
-      careerData.basesOnBalls += seasonStats.basesOnBalls;
-      careerData.strikeouts += seasonStats.strikeouts;
-      careerData.battersFaced += seasonStats.battersFaced;
-      careerData.qualityStarts += seasonStats.qualityStarts;
-      careerData.flyouts += seasonStats.flyouts;
-      careerData.groundouts += seasonStats.groundouts;
+      // Add current season tallies to careerSeasonData
+      careerSeasonData.wins += seasonStats.wins;
+      careerSeasonData.losses += seasonStats.losses;
+      careerSeasonData.appearances += seasonStats.appearances;
+      careerSeasonData.inningsPitched += seasonStats.inningsPitched;
+      careerSeasonData.shutouts += seasonStats.shutouts;
+      careerSeasonData.hitsAllowed += seasonStats.hitsAllowed;
+      careerSeasonData.homeRuns += seasonStats.homeRuns;
+      careerSeasonData.earnedRuns += seasonStats.earnedRuns;
+      careerSeasonData.basesOnBalls += seasonStats.basesOnBalls;
+      careerSeasonData.strikeouts += seasonStats.strikeouts;
+      careerSeasonData.battersFaced += seasonStats.battersFaced;
+      careerSeasonData.qualityStarts += seasonStats.qualityStarts;
+      careerSeasonData.flyouts += seasonStats.flyouts;
+      careerSeasonData.groundouts += seasonStats.groundouts;
     });
 
-    Object.keys(postSeasonsData).forEach((postSeason) => {
-      let postSeasonStats = pitcherSummaries[pitcher].postSeasons[postSeason];
+    Object.keys(postseasonsData).forEach((postseason) => {
+      let postseasonStats = pitcherSummaries[pitcher].postseasons[postseason];
 
       // Calculate non-tally based postseason stats
-      postSeasonStats.basesOnBallsPerNine = calculateBasesOnBallsPerNine(postSeasonStats);
-      postSeasonStats.earnedRunAverage = calculateEarnedRunAverage(postSeasonStats);
-      postSeasonStats.hitsAllowedPerNine = calculateHitsAllowedPerNine(postSeasonStats);
-      postSeasonStats.homeRunsPerNine = calculateHomeRunsPerNine(postSeasonStats);
-      postSeasonStats.strikeoutsPerNine = calculateStrikeoutsPerNine(postSeasonStats);
-      postSeasonStats.strikeoutRate = calculateStrikeoutRate(postSeasonStats);
-      postSeasonStats.strikeoutToWalkRatio = calculateStrikeoutToWalkRatio(postSeasonStats);
-      postSeasonStats.walksAndHitsPerInningPitched = calculateWalksAndHitsPerInningPitched(postSeasonStats);
-      postSeasonStats.walkRate = calculateWalkRate(postSeasonStats);
-      postSeasonStats.winningPercentage = calculateWinningPercentage(postSeasonStats);
+      postseasonStats.basesOnBallsPerNine = calculateBasesOnBallsPerNine(postseasonStats);
+      postseasonStats.earnedRunAverage = calculateEarnedRunAverage(postseasonStats);
+      postseasonStats.hitsAllowedPerNine = calculateHitsAllowedPerNine(postseasonStats);
+      postseasonStats.homeRunsPerNine = calculateHomeRunsPerNine(postseasonStats);
+      postseasonStats.strikeoutsPerNine = calculateStrikeoutsPerNine(postseasonStats);
+      postseasonStats.strikeoutRate = calculateStrikeoutRate(postseasonStats);
+      postseasonStats.strikeoutToWalkRatio = calculateStrikeoutToWalkRatio(postseasonStats);
+      postseasonStats.walksAndHitsPerInningPitched = calculateWalksAndHitsPerInningPitched(postseasonStats);
+      postseasonStats.walkRate = calculateWalkRate(postseasonStats);
+      postseasonStats.winningPercentage = calculateWinningPercentage(postseasonStats);
+
+      // Add current season tallies to careerPostseasonData
+      careerPostseasonData.wins += postseasonStats.wins;
+      careerPostseasonData.losses += postseasonStats.losses;
+      careerPostseasonData.appearances += postseasonStats.appearances;
+      careerPostseasonData.inningsPitched += postseasonStats.inningsPitched;
+      careerPostseasonData.shutouts += postseasonStats.shutouts;
+      careerPostseasonData.hitsAllowed += postseasonStats.hitsAllowed;
+      careerPostseasonData.homeRuns += postseasonStats.homeRuns;
+      careerPostseasonData.earnedRuns += postseasonStats.earnedRuns;
+      careerPostseasonData.basesOnBalls += postseasonStats.basesOnBalls;
+      careerPostseasonData.strikeouts += postseasonStats.strikeouts;
+      careerPostseasonData.battersFaced += postseasonStats.battersFaced;
+      careerPostseasonData.qualityStarts += postseasonStats.qualityStarts;
+      careerPostseasonData.flyouts += postseasonStats.flyouts;
+      careerPostseasonData.groundouts += postseasonStats.groundouts;
     });
 
     // Calculate non-tally based career season stats
-    careerData.basesOnBallsPerNine = calculateBasesOnBallsPerNine(careerData);
-    careerData.earnedRunAverage = calculateEarnedRunAverage(careerData);
-    careerData.hitsAllowedPerNine = calculateHitsAllowedPerNine(careerData);
-    careerData.homeRunsPerNine = calculateHomeRunsPerNine(careerData);
-    careerData.strikeoutsPerNine = calculateStrikeoutsPerNine(careerData);
-    careerData.strikeoutRate = calculateStrikeoutRate(careerData);
-    careerData.strikeoutToWalkRatio = calculateStrikeoutToWalkRatio(careerData);
-    careerData.walksAndHitsPerInningPitched = calculateWalksAndHitsPerInningPitched(careerData);
-    careerData.walkRate = calculateWalkRate(careerData);
-    careerData.winningPercentage = calculateWinningPercentage(careerData);
+    careerSeasonData.basesOnBallsPerNine = calculateBasesOnBallsPerNine(careerSeasonData);
+    careerSeasonData.earnedRunAverage = calculateEarnedRunAverage(careerSeasonData);
+    careerSeasonData.hitsAllowedPerNine = calculateHitsAllowedPerNine(careerSeasonData);
+    careerSeasonData.homeRunsPerNine = calculateHomeRunsPerNine(careerSeasonData);
+    careerSeasonData.strikeoutsPerNine = calculateStrikeoutsPerNine(careerSeasonData);
+    careerSeasonData.strikeoutRate = calculateStrikeoutRate(careerSeasonData);
+    careerSeasonData.strikeoutToWalkRatio = calculateStrikeoutToWalkRatio(careerSeasonData);
+    careerSeasonData.walksAndHitsPerInningPitched = calculateWalksAndHitsPerInningPitched(careerSeasonData);
+    careerSeasonData.walkRate = calculateWalkRate(careerSeasonData);
+    careerSeasonData.winningPercentage = calculateWinningPercentage(careerSeasonData);
+
+    // Calculate non-tally based postcareer season stats
+    careerPostseasonData.basesOnBallsPerNine = calculateBasesOnBallsPerNine(careerPostseasonData);
+    careerPostseasonData.earnedRunAverage = calculateEarnedRunAverage(careerPostseasonData);
+    careerPostseasonData.hitsAllowedPerNine = calculateHitsAllowedPerNine(careerPostseasonData);
+    careerPostseasonData.homeRunsPerNine = calculateHomeRunsPerNine(careerPostseasonData);
+    careerPostseasonData.strikeoutsPerNine = calculateStrikeoutsPerNine(careerPostseasonData);
+    careerPostseasonData.strikeoutRate = calculateStrikeoutRate(careerPostseasonData);
+    careerPostseasonData.strikeoutToWalkRatio = calculateStrikeoutToWalkRatio(careerPostseasonData);
+    careerPostseasonData.walksAndHitsPerInningPitched = calculateWalksAndHitsPerInningPitched(careerPostseasonData);
+    careerPostseasonData.walkRate = calculateWalkRate(careerPostseasonData);
+    careerPostseasonData.winningPercentage = calculateWinningPercentage(careerPostseasonData);
   });
 
   // Output objects to JSON files
-  await fs.promises.mkdir('./data/pitchers', { recursive: true }, (err) => {
+  await fs.promises.mkdir('./data/pitching', { recursive: true }, (err) => {
     if (err) throw err;
   });
-  const pitcherSummariesWriteStream = fs.createWriteStream('./data/pitchers/pitchers.json', {
+  const pitcherSummariesWriteStream = fs.createWriteStream('./data/pitching/pitchers.json', {
     flags: 'a'
   });
-  pitcherSummariesWriteStream.write(`${JSON.stringify({ ...pitcherSummaries })}\n`);
+  pitcherSummariesWriteStream.write(`${JSON.stringify({ ...pitcherSummaries }, null, '\t')}\n`);
   pitcherSummariesWriteStream.end();
 
   Object.keys(pitcherSummaries).forEach(async (pitcher) => {
     // Output individual pitchers summaries
     const encodedPitcherName = encodeURI(pitcherSummaries[pitcher].name.toLowerCase().replace(/\s/g, '-'));
-    await fs.promises.mkdir(`./data/pitchers/${encodedPitcherName}`, { recursive: true }, (err) => {
+    await fs.promises.mkdir(`./data/pitching/${encodedPitcherName}`, { recursive: true }, (err) => {
       if (err) throw err;
     });
     const pitcherSummaryWriteStream = fs.createWriteStream(`./data/pitching/${encodedPitcherName}/summary.json`, {
       flags: 'a'
     });
-    pitcherSummaryWriteStream.write(`${JSON.stringify({ ...pitcherSummaries[pitcher] })}\n`);
+    pitcherSummaryWriteStream.write(`${JSON.stringify({ ...pitcherSummaries[pitcher] }, null, '\t')}\n`);
     pitcherSummaryWriteStream.end();
   });
 
@@ -580,7 +609,7 @@ pipeline.on('end', async () => {
     if (err) throw err;
   });
   const playerListWriteStream = fs.createWriteStream('./data/players/players.json', { flags: 'a' });
-  playerListWriteStream.write(`${JSON.stringify(playerList)}\n`);
+  playerListWriteStream.write(`${JSON.stringify(playerList, null, '\t')}\n`);
   playerListWriteStream.end();
 
   // console.dir(pitcherSummaries, { depth: null });
@@ -640,11 +669,12 @@ function createPitcherEventObject({ quantity, relativeGameState, result }) {
 
 function createPitcherSummaryObject(initialValues) {
   const defaults = {
+    careerPostseason: initialPitcherStatsObject(),
+    careerSeason: initialPitcherStatsObject(),
     id: null,
     name: null,
-    careerData: {},
     seasons: {},
-    postSeasons: {}
+    postseasons: {}
   };
 
   // Perform a shallow copy of initialValues over defaults
@@ -670,7 +700,7 @@ function createPlayerObject(relativeGameState = {}, initialvalues = {}) {
     lastGameSeason: gameState.season,
     name: name,
     position: 'rotation',
-    slug: name.toLowerCase().replace(/\s/g, '-')
+    slug: deburr(name).toLowerCase().replace(/\s/g, '-')
   };
 }
 
