@@ -14,9 +14,8 @@ const deburr = require('lodash.deburr');
 const gameDataUpdatesFile = './data/blaseball-log.json';
 const pipeline = fs.createReadStream(gameDataUpdatesFile).pipe(ndjson.parse());
 
-// Maintain objects of all pitcher summaries and events
+// Maintain objects of all pitcher summaries and general info
 let pitcherSummaries = {};
-let pitcherEvents = {};
 let playerList = [];
 
 // Maintain a copy of the previous game state update
@@ -84,115 +83,108 @@ pipeline.on('data', (gameDataUpdate) => {
       });
     }
 
-    // Create initial event objects if pitcher hasn't been previously seen
-    if (!Object.prototype.hasOwnProperty.call(pitcherEvents, currPitcher)) {
-      pitcherEvents[currPitcher] = [];
-    }
-
-    if (currPitcher !== awayPitcher && !Object.prototype.hasOwnProperty.call(pitcherEvents, awayPitcher)) {
-      pitcherEvents[awayPitcher] = [];
-    }
-
-    if (currPitcher !== homePitcher && !Object.prototype.hasOwnProperty.call(pitcherEvents, homePitcher)) {
-      pitcherEvents[homePitcher] = [];
-    }
-
     // Add player to player list
     if (playerList.find((p) => p.id === currPitcher) === undefined) {
-      const name = gameState.topOfInning ? gameState.homePitcherName : gameState.awayPitcherName;
-      playerList.push({
-        id: currPitcher,
-        currentTeamId: gameState.topOfInning ? gameState.homeTeam : gameState.awayTeam,
-        currentTeamName: gameState.topOfInning ? gameState.homeTeamName : gameState.awayTeamName,
-        debutDay: gameState.day,
-        debutGameId: gameState._id,
-        debutSeason: gameState.season,
-        debutTeamId: gameState.topOfInning ? gameState.homeTeam : gameState.awayTeam,
-        debutTeamName: gameState.topOfInning ? gameState.homeTeamName : gameState.awayTeamName,
-        isIncinerated: false,
-        incineratedGameDay: null,
-        incineratedGameId: null,
-        incineratedGameSeason: null,
-        lastGameDay: gameState.day,
-        lastGameId: gameState._id,
-        lastGameSeason: gameState.season,
-        name: name,
-        position: 'rotation',
-        slug: deburr(name).toLowerCase().replace(/\s/g, '-')
-      });
+      playerList.push(
+        createPlayerObject({
+          initialValues: {
+            id: currPitcher,
+            name: gameState.topOfInning ? gameState.homePitcherName : gameState.awayPitcherName
+          },
+          relativeGameState: gameState
+        })
+      );
     } else {
       let player = playerList.find((p) => p.id === currPitcher);
-      player.currentTeamId = gameState.topOfInning ? gameState.homeTeam : gameState.awayTeam;
-      player.currentTeamName = gameState.topOfInning ? gameState.homeTeamName : gameState.awayTeamName;
-      player.lastGameDay = gameState.day;
-      player.lastGameId = gameState._id;
-      player.lastGameSeason = gameState.season;
-    }
 
-    if (currPitcher !== awayPitcher) {
-      if (playerList.find((p) => p.id === awayPitcher) === undefined) {
-        playerList.push({
-          id: awayPitcher,
-          currentTeamId: gameState.awayTeam,
-          currentTeamName: gameState.awayTeamName,
-          debutDay: gameState.day,
-          debutGameId: gameState._id,
-          debutSeason: gameState.season,
-          debutTeamId: gameState.awayTeam,
-          debutTeamName: gameState.awayTeamName,
-          incineratedGameDay: null,
-          incineratedGameId: null,
-          incineratedGameSeason: null,
-          isIncinerated: false,
-          lastGameDay: gameState.day,
-          lastGameId: gameState._id,
-          lastGameSeason: gameState.season,
-          name: gameState.awayPitcherName,
-          position: 'rotation',
-          slug: deburr(gameState.awayPitcherName).toLowerCase().replace(/\s/g, '-')
-        });
-      } else {
-        let player = playerList.find((p) => p.id === awayPitcher);
-        player.currentTeamId = gameState.awayTeam;
-        player.currentTeamName = gameState.awayTeamName;
+      if (player) {
+        let currPitcherName = gameState.topOfInning ? gameState.homePitcherName : gameState.awayPitcherName;
+
+        if (currPitcherName !== player.name) {
+          if (!player.aliases.find((a) => a === player.name)) {
+            player.aliases.push(player.name);
+          }
+
+          player.name = currPitcherName;
+        }
+
+        player.currentTeamId = gameState.topOfInning ? gameState.homeTeam : gameState.awayTeam;
+        player.currentTeamName = gameState.topOfInning ? gameState.homeTeamName : gameState.awayTeamName;
         player.lastGameDay = gameState.day;
         player.lastGameId = gameState._id;
         player.lastGameSeason = gameState.season;
       }
     }
 
+    if (currPitcher !== awayPitcher) {
+      if (playerList.find((p) => p.id === awayPitcher) === undefined) {
+        playerList.push(
+          createPlayerObject({
+            initialValues: {
+              id: awayPitcher,
+              currentTeamId: gameState.awayTeam,
+              currentTeamName: gameState.awayTeamName,
+              debutTeamId: gameState.awayTeam,
+              debutTeamName: gameState.awayTeamName,
+              name: gameState.awayPitcherName
+            },
+            relativeGameState: gameState
+          })
+        );
+      } else {
+        let player = playerList.find((p) => p.id === awayPitcher);
+
+        if (player) {
+          if (gameState.awayPitcherName !== player.name) {
+            if (!player.aliases.find((a) => a === player.name)) {
+              player.aliases.push(player.name);
+            }
+
+            player.name = gameState.awayPitcherName;
+          }
+
+          player.currentTeamId = gameState.awayTeam;
+          player.currentTeamName = gameState.awayTeamName;
+          player.lastGameDay = gameState.day;
+          player.lastGameId = gameState._id;
+          player.lastGameSeason = gameState.season;
+        }
+      }
+    }
+
     if (currPitcher !== homePitcher) {
       if (playerList.find((p) => p.id === homePitcher) === undefined) {
-        playerList.push({
-          id: homePitcher,
-          currentTeamId: gameState.homeTeam,
-          currentTeamName: gameState.homeTeamName,
-          incineratedGameDay: null,
-          incineratedGameId: null,
-          incineratedGameSeason: null,
-          debutDay: gameState.day,
-          debutGameId: gameState._id,
-          debutSeason: gameState.season,
-          debutTeamId: gameState.homeTeam,
-          debutTeamName: gameState.homeTeamName,
-          incineratedGameDay: null,
-          incineratedGameId: null,
-          incineratedGameSeason: null,
-          isIncinerated: false,
-          lastGameDay: gameState.day,
-          lastGameId: gameState._id,
-          lastGameSeason: gameState.season,
-          name: gameState.homePitcherName,
-          position: 'rotation',
-          slug: deburr(gameState.homePitcherName).toLowerCase().replace(/\s/g, '-')
-        });
+        playerList.push(
+          createPlayerObject({
+            initialValues: {
+              id: homePitcher,
+              currentTeamId: gameState.homeTeam,
+              currentTeamName: gameState.homeTeamName,
+              debutTeamId: gameState.homeTeam,
+              debutTeamName: gameState.homeTeamName,
+              name: gameState.homePitcherName
+            },
+            relativeGameState: gameState
+          })
+        );
       } else {
         let player = playerList.find((p) => p.id === homePitcher);
-        player.currentTeamId = gameState.homeTeam;
-        player.currentTeamName = gameState.homeTeamName;
-        player.lastGameDay = gameState.day;
-        player.lastGameId = gameState._id;
-        player.lastGameSeason = gameState.season;
+
+        if (player) {
+          if (gameState.homePitcherName !== player.name) {
+            if (!player.aliases.find((a) => a === player.name)) {
+              player.aliases.push(player.name);
+            }
+
+            player.name = gameState.homePitcherName;
+          }
+
+          player.currentTeamId = gameState.homeTeam;
+          player.currentTeamName = gameState.homeTeamName;
+          player.lastGameDay = gameState.day;
+          player.lastGameId = gameState._id;
+          player.lastGameSeason = gameState.season;
+        }
       }
     }
 
@@ -240,22 +232,18 @@ pipeline.on('data', (gameDataUpdate) => {
     }
 
     // Additional helper variables for various stat tracking scenarios
-    const currPitcherEvents = pitcherEvents[currPitcher];
     const currPitcherSummary = gameState.isPostseason
       ? pitcherSummaries[currPitcher].postseasons[gameState.season]
       : pitcherSummaries[currPitcher].seasons[gameState.season];
 
-    const awayPitcherEvents = pitcherEvents[awayPitcher];
     const awayPitcherSummary = gameState.isPostseason
       ? pitcherSummaries[awayPitcher].postseasons[gameState.season]
       : pitcherSummaries[awayPitcher].seasons[gameState.season];
 
-    const homePitcherEvents = pitcherEvents[homePitcher];
     const homePitcherSummary = gameState.isPostseason
       ? pitcherSummaries[homePitcher].postseasons[gameState.season]
       : pitcherSummaries[homePitcher].seasons[gameState.season];
 
-    const prevPitcherEvents = prevPitcher ? pitcherEvents[prevPitcher] : null;
     const prevPitcherSummary = prevPitcher
       ? prevGameState.isPostseason
         ? pitcherSummaries[prevPitcher].postseasons[prevGameState.season]
@@ -295,12 +283,6 @@ pipeline.on('data', (gameDataUpdate) => {
       gameState.lastUpdate.match(/Game Over/i) !== null
     ) {
       prevPitcherSummary.inningsPitched += 1;
-      prevPitcherEvents.push(
-        createPitcherEventObject({
-          relativeGameState: gameState,
-          result: 'inningPitched'
-        })
-      );
     }
 
     // @TODO: Increment number of pitches
@@ -311,58 +293,20 @@ pipeline.on('data', (gameDataUpdate) => {
       if (gameState.homeScore > gameState.awayScore) {
         homePitcherSummary.wins += 1;
         awayPitcherSummary.losses += 1;
-
-        homePitcherEvents.push(
-          createPitcherEventObject({
-            relativeGameState: gameState,
-            result: 'win'
-          })
-        );
-        awayPitcherEvents.push(
-          createPitcherEventObject({
-            relativeGameState: gameState,
-            result: 'loss'
-          })
-        );
       } else {
         awayPitcherSummary.wins += 1;
         homePitcherSummary.losses += 1;
-
-        awayPitcherEvents.push(
-          createPitcherEventObject({
-            relativeGameState: gameState,
-            result: 'win'
-          })
-        );
-        homePitcherEvents.push(
-          createPitcherEventObject({
-            relativeGameState: gameState,
-            result: 'loss'
-          })
-        );
       }
     }
 
     // Increment flyouts
     if (prevGameState && gameState.lastUpdate.match(/flyout/i) !== null) {
       prevPitcherSummary.flyouts += 1;
-      prevPitcherEvents.push(
-        createPitcherEventObject({
-          relativeGameState: prevGameState,
-          result: 'flyout'
-        })
-      );
     }
 
     // Increment groundouts
     if (prevGameState && gameState.lastUpdate.match(/ground out/i) !== null) {
       prevPitcherSummary.groundouts += 1;
-      prevPitcherEvents.push(
-        createPitcherEventObject({
-          relativeGameState: prevGameState,
-          result: 'groundout'
-        })
-      );
     }
 
     // Update player attributes following incineration
@@ -386,73 +330,39 @@ pipeline.on('data', (gameDataUpdate) => {
     // Increment hits allowed (encompasses home runs, doubles, etc)
     if (prevPitcherSummary && gameState.lastUpdate.match(/hits a/i) !== null) {
       prevPitcherSummary.hitsAllowed += 1;
-      prevPitcherEvents.push(
-        createPitcherEventObject({
-          relativeGameState: prevGameState,
-          result: 'hit'
-        })
-      );
     }
 
     // Increment bases on balls
     if (prevPitcherSummary && gameState.lastUpdate.match(/draws a walk/i) !== null) {
       prevPitcherSummary.basesOnBalls += 1;
-      prevPitcherEvents.push(
-        createPitcherEventObject({
-          relativeGameState: prevGameState,
-          result: 'baseOnBalls'
-        })
-      );
     }
 
     // Increment strikeouts
     // @TODO: Check to see if currPitcher changes if strikeout leads to inning change
     if (prevGameState && gameState.lastUpdate.match(/(strikes out|struck out)/i) !== null) {
       prevPitcherSummary.strikeouts += 1;
-      prevPitcherEvents.push(
-        createPitcherEventObject({
-          relativeGameState: prevGameState,
-          result: 'strikeout'
-        })
-      );
     }
 
     // Increment batters faced
     if (gameState.lastUpdate.match(/batting for/i) !== null) {
       currPitcherSummary.battersFaced += 1;
-      currPitcherEvents.push(
-        createPitcherEventObject({
-          relativeGameState: gameState,
-          result: 'batterFaced'
-        })
-      );
     }
 
     // Increment earned runs
     // @TODO: Account for mid-game pitcher changes
-    if (
-      (prevGameState && prevGameState.halfInningOuts === 2 && gameState.halfInningOuts === 0) ||
-      (prevGameState && prevGameState.gameComplete === false && gameState.gameComplete)
-    ) {
-      prevPitcherSummary.earnedRuns += prevGameState.halfInningScore;
-      prevPitcherEvents.push(
-        createPitcherEventObject({
-          quantity: prevGameState.halfInningScore,
-          relativeGameState: prevGameState,
-          result: 'earnedRunAllowed'
-        })
-      );
+    if (prevGameState && prevGameState.awayScore !== gameState.awayScore) {
+      const scoreDiff = gameState.awayScore - prevGameState.awayScore;
+      homePitcherSummary.earnedRuns += scoreDiff;
+    }
+
+    if (prevGameState && prevGameState.homeScore !== gameState.homeScore) {
+      const scoreDiff = gameState.homeScore - prevGameState.homeScore;
+      awayPitcherSummary.earnedRuns += scoreDiff;
     }
 
     // Increment home runs allowed
     if (prevGameState && gameState.lastUpdate.match(/home run|grand slam/i) !== null) {
       prevPitcherSummary.homeRuns += 1;
-      prevPitcherEvents.push(
-        createPitcherEventObject({
-          relativeGameState: prevGameState,
-          result: 'homeRun'
-        })
-      );
     }
 
     // Increment quality starts
@@ -656,17 +566,6 @@ function calculateWinningPercentage(stats) {
   return stats.wins > 0 ? stats.wins / (stats.wins + stats.losses) : stats.losses !== 0 ? 0 : 1;
 }
 
-function createPitcherEventObject({ quantity, relativeGameState, result }) {
-  return {
-    gameId: relativeGameState._id,
-    inning: relativeGameState.inning,
-    outs: relativeGameState.halfInningOuts,
-    quantity: quantity,
-    result: result,
-    seasonId: relativeGameState.season
-  };
-}
-
 function createPitcherSummaryObject(initialValues) {
   const defaults = {
     careerPostseason: initialPitcherStatsObject(),
@@ -681,27 +580,36 @@ function createPitcherSummaryObject(initialValues) {
   return Object.assign({}, defaults, initialValues);
 }
 
-function createPlayerObject(relativeGameState = {}, initialvalues = {}) {
+function createPlayerObject({ initialValues, relativeGameState }) {
+  const currPitcherTeamId = relativeGameState.topOfInning ? relativeGameState.homeTeam : relativeGameState.awayTeam;
+  const currPitcherTeamName = relativeGameState.topOfInning
+    ? relativeGameState.homeTeamName
+    : relativeGameState.awayTeamName;
+
   const defaults = {
-    id: currPitcher,
-    currentTeamId: gameState.topOfInning ? gameState.homeTeam : gameState.awayTeam,
-    currentTeamName: gameState.topOfInning ? gameState.homeTeamName : gameState.awayTeamName,
-    debutDay: gameState.day,
-    debutGameId: gameState._id,
-    debutSeason: gameState.season,
-    debutTeamId: gameState.topOfInning ? gameState.homeTeam : gameState.awayTeam,
-    debutTeamName: gameState.topOfInning ? gameState.homeTeamName : gameState.awayTeamName,
+    aliases: [],
+    id: null,
+    currentTeamId: currPitcherTeamId,
+    currentTeamName: currPitcherTeamName,
+    debutDay: relativeGameState.day,
+    debutGameId: relativeGameState._id,
+    debutSeason: relativeGameState.season,
+    debutTeamId: currPitcherTeamId,
+    debutTeamName: currPitcherTeamName,
     isIncinerated: false,
     incineratedGameDay: null,
     incineratedGameId: null,
     incineratedGameSeason: null,
-    lastGameDay: gameState.day,
-    lastGameId: gameState._id,
-    lastGameSeason: gameState.season,
-    name: name,
+    lastGameDay: relativeGameState.day,
+    lastGameId: relativeGameState._id,
+    lastGameSeason: relativeGameState.season,
+    name: null,
     position: 'rotation',
-    slug: deburr(name).toLowerCase().replace(/\s/g, '-')
+    slug: initialValues.hasOwnProperty('name') ? deburr(initialValues.name).toLowerCase().replace(/\s/g, '-') : null
   };
+
+  // Perform a shallow copy of initialValues over defaults
+  return Object.assign({}, defaults, initialValues);
 }
 
 function initialPitcherStatsObject(initialValues = {}) {

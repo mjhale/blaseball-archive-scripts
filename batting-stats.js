@@ -85,11 +85,22 @@ pipeline.on('data', (gameDataUpdate) => {
         );
       } else {
         let player = playerList.find((p) => p.id === currBatter);
-        player.currentTeamId = gameState.topOfInning ? gameState.awayTeam : gameState.homeTeam;
-        player.currentTeamName = gameState.topOfInning ? gameState.awayTeamName : gameState.homeTeamName;
-        player.lastGameDay = gameState.day;
-        player.lastGameId = gameState._id;
-        player.lastGameSeason = gameState.season;
+
+        if (player) {
+          if (currBatterName !== player.name) {
+            if (!player.aliases.find((a) => a === player.name)) {
+              player.aliases.push(player.name);
+            }
+
+            player.name = currBatterName;
+          }
+
+          player.currentTeamId = gameState.topOfInning ? gameState.awayTeam : gameState.homeTeam;
+          player.currentTeamName = gameState.topOfInning ? gameState.awayTeamName : gameState.homeTeamName;
+          player.lastGameDay = gameState.day;
+          player.lastGameId = gameState._id;
+          player.lastGameSeason = gameState.season;
+        }
       }
     }
 
@@ -557,6 +568,7 @@ function createPlayerObject({ initialValues, relativeGameState }) {
   const currTeamName = relativeGameState.topOfInning ? relativeGameState.awayTeamName : relativeGameState.homeTeamName;
 
   const defaults = {
+    aliases: [],
     id: null,
     currentTeamId: currTeamId,
     currentTeamName: currTeamName,
