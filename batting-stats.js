@@ -33,8 +33,13 @@ pipeline.on('data', (gameDataUpdate) => {
 
   // Iterate through each game in current tick
   currGameStates.forEach((gameState) => {
+    // Normalize ID field to account for old archives and new archives (_id and id)
+    if (!gameState.hasOwnProperty('id') && gameState.hasOwnProperty('_id')) {
+      gameState.id = gameState._id;
+    }
+
     // Create a reference to the game's previous tick state
-    const prevGameState = prevGameStates ? prevGameStates.find((prevState) => prevState._id === gameState._id) : null;
+    const prevGameState = prevGameStates ? prevGameStates.find((prevState) => prevState.id === gameState.id) : null;
 
     // Ignore games that have not started
     if (!gameState.gameStart) {
@@ -98,7 +103,7 @@ pipeline.on('data', (gameDataUpdate) => {
           player.currentTeamId = gameState.topOfInning ? gameState.awayTeam : gameState.homeTeam;
           player.currentTeamName = gameState.topOfInning ? gameState.awayTeamName : gameState.homeTeamName;
           player.lastGameDay = gameState.day;
-          player.lastGameId = gameState._id;
+          player.lastGameId = gameState.id;
           player.lastGameSeason = gameState.season;
         }
       }
@@ -174,12 +179,12 @@ pipeline.on('data', (gameDataUpdate) => {
 
     // Increment appearances
     // @TODO: Account for mid-game substitutions / incinerations
-    if (!seenBatters.hasOwnProperty(gameState._id)) {
-      seenBatters[gameState._id] = {};
+    if (!seenBatters.hasOwnProperty(gameState.id)) {
+      seenBatters[gameState.id] = {};
     }
 
-    if (!seenBatters[gameState._id].hasOwnProperty(currBatter)) {
-      seenBatters[gameState._id][currBatter] = gameState.inning;
+    if (!seenBatters[gameState.id].hasOwnProperty(currBatter)) {
+      seenBatters[gameState.id][currBatter] = gameState.inning;
       currBatterSummary.appearances += 1;
     }
 
@@ -383,7 +388,7 @@ pipeline.on('data', (gameDataUpdate) => {
       // Update incinerated player's player file
       if (incineratedPlayer) {
         incineratedPlayer.incineratedGameDay = prevGameState.day;
-        incineratedPlayer.incineratedGameId = prevGameState._id;
+        incineratedPlayer.incineratedGameId = prevGameState.id;
         incineratedPlayer.incineratedGameSeason = prevGameState.season;
         incineratedPlayer.isIncinerated = true;
       } else {
@@ -573,7 +578,7 @@ function createPlayerObject({ initialValues, relativeGameState }) {
     currentTeamId: currTeamId,
     currentTeamName: currTeamName,
     debutDay: relativeGameState.day,
-    debutGameId: relativeGameState._id,
+    debutGameId: relativeGameState.id,
     debutSeason: relativeGameState.season,
     debutTeamId: currTeamId,
     debutTeamName: currTeamName,
@@ -582,7 +587,7 @@ function createPlayerObject({ initialValues, relativeGameState }) {
     incineratedGameId: null,
     incineratedGameSeason: null,
     lastGameDay: relativeGameState.day,
-    lastGameId: relativeGameState._id,
+    lastGameId: relativeGameState.id,
     lastGameSeason: relativeGameState.season,
     name: null,
     position: 'lineup',

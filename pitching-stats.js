@@ -32,8 +32,13 @@ pipeline.on('data', (gameDataUpdate) => {
 
   // Iterate through each game in current tick
   currGameStates.forEach((gameState) => {
+    // Normalize ID field to account for old archives and new archives (_id and id)
+    if (!gameState.hasOwnProperty('id') && gameState.hasOwnProperty('_id')) {
+      gameState.id = gameState._id;
+    }
+
     // Create a reference to the game's previous tick state
-    const prevGameState = prevGameStates ? prevGameStates.find((prevState) => prevState._id === gameState._id) : null;
+    const prevGameState = prevGameStates ? prevGameStates.find((prevState) => prevState.id === gameState.id) : null;
 
     // Ignore games that have not started
     if (!gameState.gameStart) {
@@ -111,7 +116,7 @@ pipeline.on('data', (gameDataUpdate) => {
         player.currentTeamId = gameState.topOfInning ? gameState.homeTeam : gameState.awayTeam;
         player.currentTeamName = gameState.topOfInning ? gameState.homeTeamName : gameState.awayTeamName;
         player.lastGameDay = gameState.day;
-        player.lastGameId = gameState._id;
+        player.lastGameId = gameState.id;
         player.lastGameSeason = gameState.season;
       }
     }
@@ -146,7 +151,7 @@ pipeline.on('data', (gameDataUpdate) => {
           player.currentTeamId = gameState.awayTeam;
           player.currentTeamName = gameState.awayTeamName;
           player.lastGameDay = gameState.day;
-          player.lastGameId = gameState._id;
+          player.lastGameId = gameState.id;
           player.lastGameSeason = gameState.season;
         }
       }
@@ -182,7 +187,7 @@ pipeline.on('data', (gameDataUpdate) => {
           player.currentTeamId = gameState.homeTeam;
           player.currentTeamName = gameState.homeTeamName;
           player.lastGameDay = gameState.day;
-          player.lastGameId = gameState._id;
+          player.lastGameId = gameState.id;
           player.lastGameSeason = gameState.season;
         }
       }
@@ -319,7 +324,7 @@ pipeline.on('data', (gameDataUpdate) => {
       // Update incinerated player's player file
       if (incineratedPlayer) {
         incineratedPlayer.incineratedGameDay = prevGameState.day;
-        incineratedPlayer.incineratedGameId = prevGameState._id;
+        incineratedPlayer.incineratedGameId = prevGameState.id;
         incineratedPlayer.incineratedGameSeason = prevGameState.season;
         incineratedPlayer.isIncinerated = true;
       } else {
@@ -592,7 +597,7 @@ function createPlayerObject({ initialValues, relativeGameState }) {
     currentTeamId: currPitcherTeamId,
     currentTeamName: currPitcherTeamName,
     debutDay: relativeGameState.day,
-    debutGameId: relativeGameState._id,
+    debutGameId: relativeGameState.id,
     debutSeason: relativeGameState.season,
     debutTeamId: currPitcherTeamId,
     debutTeamName: currPitcherTeamName,
@@ -601,7 +606,7 @@ function createPlayerObject({ initialValues, relativeGameState }) {
     incineratedGameId: null,
     incineratedGameSeason: null,
     lastGameDay: relativeGameState.day,
-    lastGameId: relativeGameState._id,
+    lastGameId: relativeGameState.id,
     lastGameSeason: relativeGameState.season,
     name: null,
     position: 'rotation',
